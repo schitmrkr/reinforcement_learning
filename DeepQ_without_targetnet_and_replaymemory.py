@@ -96,6 +96,20 @@ class Agent():
 
         q_eval = self.Q_evals.forward(state_batch)[batch_index, action_batch]
         q_next = self.Q_evals.forward(new_state_batch)
+        q_next[terminal_batch] = 0.0
+
+        q_target = reward_batch + self.gamma * torch.max(q_next, axis=1)[0]
+
+        loss = self.Q_evals.loss(q_target, q_eval).to(self.Q_evals.device)
+        loss.backward()
+        self.Q_evals.optimizer.step()
+
+        self.epsilon = self.epsilon - self.eps_dec if self.epsilon > self.eps_min \
+                        else self.eps_min
+
+        
+
+
 
 
 
