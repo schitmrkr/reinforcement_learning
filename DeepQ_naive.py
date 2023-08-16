@@ -6,6 +6,8 @@ import torch.nn.functional as F
 
 import numpy as np
 
+from utils import plot_learning_curve
+
 
 class LinearDeepQNetwork(nn.Module):
     def __init__(self, lr, n_actions, input_dims):
@@ -60,8 +62,62 @@ class Agent():
 
 
     def learn(self, state, action, reward, state_):
+        self.Q.optimizer.zero_grad()
+        states = torch.tensor(state, dtype=torch.float).to(self.Q.device)
+        actions = torch.tensor(action).to(self.Q.device)
+        rewards = torch.tensor(reward).to(self.Q.device)
+        states_ = torch.tensor(state_, dtype=torch.float).to(self.Q.device)
         
-        pass
+        q_pred = self.Q.forward(states)[actions]
+
+        q_next = self.Q.forward(states_).max()
+
+        q_target = reward + self.gamma * q_next
+
+        loss = self.Q.loss(q_target, q_pred).to(self.Q.device)
+        loss.backward()
+        self.Q.optimizer.step()
+        self.decrement_epsilon()
+
+
+if __name__ == "__main__":
+    env = gym.make('CartPole-v1')
+    n_games = 10000
+    scores = []
+    eps_history = []
+
+    agent = Agent(lr=0.0001, input_dims=env.observation_space.shape, n_actions=env.action_space.n)
+
+    for i in range(n_games):
+        score = 0
+        done = False
+        obs = env.reset()
+        obs = obs[0]
+
+        while not done:
+            action = agent.choose_action(obs)
+            obs_, reward, done, truncated, info = env.step(action)
+            
+            score += reward
+            agent.learn(obs, action, reward, obs_)
+            obs = obs_
+        
+        scores.append(score)
+        eps_history.append(agent.epsilon)
+
+        if i % 100 == 0:
+            avg_score = np.mean(scores[-100:])
+            print('episode ', i, 'score %.1f avg score %.1f epsilon %.2f ' % (score, avg_score, agent.epsilon))
+
+    filename = 'cartpole_naive_dqn.png'
+    x = [i+1 for i in range(n_games)]
+    plot_learning_curve(x, scores, eps_history, filename)     
+
+
+
+
+
+
 
 
 
